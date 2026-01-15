@@ -21,7 +21,7 @@ torch.backends.cudnn.benchmark = True
 
 
 def init_wandb() -> None:
-    wandb.login(key="ae8ab4414cf9c9052ba0b950a538c17ff254d492")
+    wandb.login(key="WANDB_KEY")
     wandb.init(
         entity=os.getenv("WANDB_ENTITY"),
         project=os.getenv("WANDB_PROJECT"),
