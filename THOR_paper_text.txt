@@ -1,0 +1,830 @@
+=== PAGE 1 ===
+ThoR: A Motion-Dependent Physics-Informed Deep
+Learning Framework with Constraint-Centric Theory
+of Functional Connections for Rainfall Nowcasting
+Khang Ta Gia1,2,*, Hoai Tran Van1,+, An Phan Thanh2, and Nhat Phan Minh3
+1FacultyofComputerScienceandEngineering,HoChiMinhCityUniversityofTechnology,HoChiMinhCity,
+Vietnam
+2InstituteofMathematicalandComputationalSciences,HoChiMinhCityUniversityofTechnology,HoChiMinh
+City,Vietnam
+3FacultyofInformationTechnology,UniversityofDanang-UniversityofScienceandTechnology,DaNang,Vietnam
++CorrespondingAuthor
+*tagiakhang19@gmail.com
+ABSTRACT
+Accurate precipitation nowcasting is crucial for mitigating the impacts of extreme weather, especially as climate change
+increasestheirfrequencyandseverity. Traditionalmethods,suchasnumericalweatherpredictionandradarextrapolation,face
+limitationsinshort-termandhigh-resolutionforecasting. Recently,whiledeeplearningapproacheshaveadvancednowcasting
+bylearningspatiotemporalpatternsfromradardata,theyoftensufferfromblurryresultsduetouncertaintypredictionsand
+limitedphysicalconsistency. Todealwiththesechallenges,weproposeThoR,aMotion-DependentPhysics-InformedDeep
+Learning Framework with Constraint-Centric Theory of Functional Connections for Rainfall Nowcasting. ThoR integrates
+attention-centricspatio-temporalmodelingwithexplicitphysicalconstraintsderivedfrompartialdifferentialequations(PDEs)
+forforwardsimulation,whichemploysacascaded-brancharchitecturethatintegratesanattention-drivengeneratorwithan
+unsupervised,lead-time-conditionedmoduleformotionfieldextraction.Physicalconsistencyisenforcedbyweightedembedding
+theadvection–diffusionequationdirectlyintotheoptimizationobjective,establishingaTheoryofFunctionalConnections(TFC)
+frameworktailoredforprecipitationnowcasting. Extensiveexperimentsonreal-worldradardatasetsdemonstratethatThoR
+achievespromisedperformancecomparedtoexistingmethodsacrossbothdeterministicandprobabilisticmetrics,particularly
+atlongerleadtimesandduringextremeevents,highlightingthepotentialofphysics-informeddeeplearningforoperational
+nowcasting.
+1 Introduction
+Weatherforecasting,thepredictionoffutureatmosphericconditionssuchasprecipitation,temperature,pressure,andwind,
+playsacrucialroleinbothscienceandsociety1. InVietnam,naturaldisastersin2024resultedin514fatalitiesandeconomic
+lossesofabout88.748trillionVND2.Asaresult,accurateweatherforecastshavefar-reachingsocialandeconomicbenefits,
+improvingdailydecision-makingandcontributingsignificantlytonumeroussectors,suchasagriculture,energy,transportation,
+anddisasterprevention3,4. Quantitativeprecipitationnowcasting(QPN)isconsideredtobeoneofthemostchallengingaspects
+ofthisfield.
+Precipitationnowcastingtechniquesprimarilyfallintotwocategories: (1)numericalweatherprediction(NWP)and(2)
+radarechoextrapolation. NWPmodelssimulateatmosphericdynamicsbasedonphysicallaws;however,theyoftenstruggle
+toproduceaccurateshort-termforecastsduetoinitializationerrorsandcomputationallatency5,6. Incontrast, radar-based
+approaches,suchasopticalflowestimationandcentroidtracking7,8,offerhighertemporalresolutionbuttypicallyassume
+conservedreflectivityandsmoothmotion,assumptionsthatbreakdownduringrapidlyevolvingconvectivesystems9,10. Both
+paradigmsexhibitnotablelimitationsincapturingthelocalizedandnonlinearcharacteristicsofprecipitation,therebymotivating
+theexplorationofdata-drivendeeplearning(DL)methodologies11,12.
+Deeplearninghasdemonstratedconsiderablepotentialinmodelingcomplexspatiotemporalpatternsinherentinradar
+reflectivitysequences,circumventingtheneedforhandcraftedheuristics. Thesemodelsgenerallyfallintotwocategories:
+non-adversarialandadversarialapproaches. Non-adversarialmodels,suchasConvLSTM11,TrajGRU13,andthePredRNN
+family12,14,focusoncapturingspatiotemporaldependenciesusingconvolutionalrecurrentstructures. Innovationssuchas
+hierarchicalmemorycells, attentionmechanisms, andmotiondecompositionhaveimprovedtheirforecastingcapabilities.
+However,thesemodelsoftensufferfromblurredoutputsinlong-rangepredictions,largelyduetotheirrelianceongloballoss
+
+=== PAGE 2 ===
+functionslikeMSE,whichintroducethe"doublepenalty"problem15,16andfailtopreservehigh-frequencydetails17.Incontrast,
+adversarialmodelsemployGANframeworkstogeneratesharper,morerealisticprecipitationforecasts. DGMR18,forexample,
+utilizesConvGRU-basedgeneratorswithstochasticsamplingtobettermodeltheuncertaintyinradarfields. Despiteimproved
+visualfidelity,adversarialmodelsfacechallengessuchasmodecollapseanddifficultyinmodelinglong-termdependencies.
+Recentadvancements, includingself-clustering(ClusterCast19)andtransformer-basedhybrids(ConvLSTM-TransGAN20,
+SAC-LSTM21),havesoughttoaddresstheselimitationsbyenhancingdiversityandtemporalcoherence. Toovercomethe
+limitationsofconventionallossfunctionsinprecipitationnowcasting,recentstudieshaveproposedarangeofspecialized
+objectiveformulations. Weightedlossesimprovesensitivitytohigh-intensitybutinfrequentrainfallbyamplifyingpenaltieson
+severeevents13,18,whilepooling-basedlossesenhancespatialstructurerecognitionbyfocusingonlarge-scaleprecipitation
+patternsandreducingnoisesensitivity22. Motion-regularizedlossesintroducegradient-basedsmoothnessconstraintstoenforce
+realisticspatiotemporaldynamics23,24. Probabilisticlearningframeworksfurtherbalanceperformanceacrossrainfallregimes
+byapproximatingclassificationmetricsinadifferentiableform25.
+Inaddition,apersistentlimitationincurrentDL-basednowcastingsystemsistheirlimitedintegrationofphysicalknowledge.
+Manymodelslackphysicalinterpretabilityandmayviolatefundamentalatmosphericprinciples,particularlyunderextremeor
+out-of-distributionscenarios. Toaddressthis,recentresearchhasbeguntoincorporatephysics-informedlearningbyembedding
+constraintssuchasmassconservationandadvectiondynamicsdirectlyintomodelarchitecturesandlossfunctions26–28. The
+ExtremeTheoryofFunctionalConnections(TFC)29,30offersapromisingmathematicalframeworkforrepresentingfunctions
+thatadheretosuchconstraints, therebyprovidingaprincipledmechanismtoincorporatephysicallawsintodeeplearning
+modelsforprecipitationforecasting.
+Buildingonrecentadvances,weintroduceThoR,anovelphysics-informeddeeplearningframeworkgroundedintheTFC,
+wherespatiotemporalmodelingisintegratedwithexplicitphysicalconstraintsforprecipitationnowcasting. ThoRemploysa
+cascaded-brancharchitecture,comprisinganattention-centricstatespacegeneratorthatcapturescomplexdependenciesin
+bothspatialandtemporaldimensions,alongsideamodulethatpredictspairedadvectionmotionfieldstorepresentdynamic
+atmosphericflows. Thesemotionfieldsareutilizedinahybridmanner—bothembeddedwithinthegeneratorforprecipitation
+mapforecastingandincorporatedintotheoptimizationobjectiveviatheadvection–diffusionequation,therebyreinforcing
+physicalconsistencyandenhancingpredictiveaccuracy. Throughthedirectembeddingofdomainknowledgeintothelearning
+process,asignificantadvancementinnowcastingcapabilitiesisachieved,offeringforecaststhataremorereliable,interpretable,
+andphysicallygrounded,particularlyunderhighlydynamicandextremeweatherconditions.
+Tosumup,theprincipalcontributionsofthisworkareasfollows:
+• We enhance the Theory of Functional Connections by embedding the advection–diffusion equation and associated
+physicalconstraintsdirectlyintotheoptimizationobjectivesofeachcomponentofourframework. Thisapproach,which
+wecalled"SoftTFCwithconstraintcentric",therebyenhancesinterpretabilityandimprovespredictiveperformancein
+fittingmultidimensionalPDEsofprecipitationnowcasting.
+• WeproposeThoR,ahybridphysics-informeddeeplearningframeworkthatintegratesattention-basedspatiotemporal
+modelingwithexplicitphysicalconstraintsderivedfromPDEs.ThoRenablesaccurateforwardsimulationofprecipitation
+fields,deliveringskillfulforecastsacrossawiderangeofrainfallintensities,withnotableperformanceinpredicting
+extremeprecipitationeventsgovernedbyadvectiveandconvectivedynamicsthathavehistoricallyposedconsiderable
+modelingchallenges.
+2 Results
+To rigorously assess the performance of ThoR, we conducted empirical evaluations against three state-of-the-art baseline
+methods: PySTEPS8,NowcastNet31,andTrajGRU13.Experimentswerecarriedoutontwogeographicallyandclimatologically
+distinctdatasets: theMulti-RadarMulti-Sensor(MRMS)system32 andradarobservationsfromtheNhaBeWeatherRadar
+StationinHoChiMinhCity33. Eachdatasetwasdividedintotrainingandtestingsubsetsusingastandardized80/20split. To
+ensurefaircomparison,wereproducedallbaselinemodelsusingtheirofficialopen-sourceimplementationsandtrainedthem
+fromscratchunderidenticaltrainingandevaluationprotocols. Thisunifiedexperimentalframeworkenabledacomprehensive
+andregionallydiverseevaluationofThoR’sgeneralizationcapabilitiesandpredictiveperformance.
+2.1 Problemdescription
+WeintroduceThoR,aphysics-informednowcastingframeworkgroundedinconditionalgenerativemodelingforprecipitation
+forecasting. Themodeloperatesonaninputsequenceofobservedprecipitationfields,denotedasR ={R ,R ,···,R}∈
+in 1 2 t
+Rt×h×w, wheret representsthenumberof inputtimesteps, andhandwcorrespondtothespatial dimensions(heightand
+width) of each radar-derived precipitation map. The objective is to generate a sequence of future rainfall fields R =
+out
+{R ,R ,···,R }∈Rn×h×w,wherendenotestheforecasthorizonintimesteps.
+t+1 t+2 t+n
+2/17
+
+=== PAGE 3 ===
+ThoR adopts a recursive generative formulation, predicting each future frame sequentially. At each time step i∈{t+
+1,...,t+n},themodelestimatestheconditionaldistributionofthenextframegivenallpreviousframes. Eachhiddenstate
+encodestheevolvingatmosphericdynamicsatthattimestep,conditionedontheinferredmotionfield. Theoverallforecasting
+taskiscastasasequentialprobabilisticestimation:
+t+n
+P(R |R )= ∏ P(R |R ,···,R ), (1)
+out in i 1 i−1
+i=t+1
+Thisautoregressiveformulationenablesthemodeltodynamicallyupdateitsinternalrepresentationasnewpredictionsare
+generated,allowingittocapturetemporallynon-stationarydependenciesthatarecharacteristicofatmosphericprocesses.
+ThoRconsistsoftwomaincomponents: (1)anattention-drivenspatiotemporalgenerativenetworkG,parameterizedbyθ,
+and(2)adeterministicmotionestimationmoduleM ,parameterizedbyφ,whichinferslarge-scaleadvectivemotionfields
+φ
+fromtheobservedprecipitationsequence. Theforecastingtaskisframedasahybrid,physics-awareconditionalgeneration
+problem,incorporatinglatentstochasticvariableszthatencodeboththeextractedadvectivemotionandthefine-grainedresidual
+deformationslearnedbythespatiotemporalencoder. Thedistributionoverfutureprecipitationisgivenby:
+(cid:90)
+P(Rˆ |R ,φ,θ)= P(Rˆ |R ,M (R ),z;θ)P(z)dz. (2)
+t+1:t+n 1:t t+1:t+n 1:t φ 1:t
+Bymarginalizingoverthelatentspacez,themodelensuresthattheresultingforecastsarebothspatiallycoherentand
+probabilisticallywell-calibrated.Thetrainingobjectiveintegratesphysicallygroundedconstraintswithconventionaldata-driven
+lossfunctions,promotingdynamicallyconsistentandmeteorologicallyrealisticpredictions. ThisformulationenablesThoRto
+deliverhigh-fidelity,probabilisticnowcasts,makingitwellsuitedforoperationaldeploymentinearlywarningsystemsandthe
+real-timemonitoringofextremeweatherevents.
+2.2 Dataset
+2.2.1 TheMRMSDataset
+ThedatasetemployedinthisstudyisderivedfromNOAA’sMulti-RadarMulti-Sensor(MRMS)system32,whichintegrates
+radar, satellite, surface, upper-air, numerical weather prediction, and climatological data into high-resolution, temporally
+consistentmosaics. Designedforbothoperationalandresearchuse,MRMSprovidesover100meteorologicalproductswidely
+adoptedbyagenciessuchastheNWS,FEMA,andFAAforprecipitationestimationandsevereweatherforecasting.
+Wespecificallyutilizetheradar-derivedPrecipitationRatefieldacrossthecontinentalU.S.from2016to2022tosupport
+radar-basedrainfallnowcasting.Toimprovecomputationalefficiencyandfocusonhigh-impactevents,wefollowtheimportance
+samplingprotocolfromDGMR18,selectingrepresentative256×256pixelsubregionscenteredonhigh-intensityrainfallat
+predefinedoffsets. Temporalsubsamplingat10-minuteintervalsbalancesresolutionwithdatavolume. Precipitationvaluesare
+clippedtothe[0,76]mm/hrangetomatchradarsensorthresholdsandsuppressnoise.
+Figure1. PrecipitationmapsofthreeselectedregionsoverthecontinentalUnitedStates. Eachinsetshowsalocalized
+precipitationdistribution(inmm/h)withtop-leftcorneratcoordinates(29.3°N,-109.3°E),(33.85°N,-106.60°E),and(38.1°N,
+-81.4°E).Thecolorbarontherightindicatesprecipitationintensity.
+3/17
+
+=== PAGE 4 ===
+Each training sample consists of a sequence of 6 past frames (representing the previous hour) and 12 future frames
+(predictingthenexttwohours),createdusingaslidingwindow. Thisalignswithstandardsequence-to-sequencemodeling
+frameworksforspatiotemporalforecasting.
+2.2.2 TheNhaBeDataset
+This study utilizes a high-resolution radar reflectivity dataset collected by the Nha Be Weather Radar Station, located in
+HoChiMinhCity,Vietnam. ThestationemploysConstantAltitudePlanPositionIndicator(CAPPI)scans,whichprovide
+two-dimensionalreflectivityfieldsatafixedaltitude. Eachvolumescancomprisesafull360◦sweepacrossmultipleelevation
+anglesandiscompletedapproximatelyevery12minutes33. Thereflectivitydataaregriddedataspatialresolutionof500m,
+spanning2305×2881gridpoints(longitude×latitude),coveringthegeographicalregionfrom103.960◦Eto109.500◦Eand
+7.950◦Nto13.360◦N.Thetemporalresolutionis10minutes.
+Table1. SpecificationsoftheMRMSandNhaBeDopplerradardatasets.
+Dataset Years Frequency Resolution Coverage
+MRMS 2016-2022 10min 1km US
+NhaBeDopplerRadar 2022-2023 10min 1km ∼120kmradius(HCMC)
+Tofacilitatespatiotemporalanalysis,therawpolarradarmeasurementswereinterpolatedontoathree-dimensionalCartesian
+grid. Reflectivityfieldsatanaltitudeof2kmweresubsequentlyextractedandusedformodeling. Radarreflectivity(Z)is
+typicallyexpressedonalogarithmicscaleasdBZ=10log (Z). Toestimatesurfacerainfallrates(R,inmm/h),reflectivity
+10
+valueswereconvertedusingtheempiricalreflectivity–rainfall(Z–R)relationship,Z=aRb,whereaandbareempirically
+derivedcoefficients. Inthisstudy,weadoptthecanonicalvaluesa=200andb=1.6,whicharewidelyusedforconvective
+precipitationregimes. RearrangingyieldstherainfallrateasR=(Z/a)1/b.
+Thedatasetspansfrom1Januaryto31December2023. Formodeldevelopment,weconstructedinput–targetsequences
+usingasliding-windowapproach: eachtrainingsamplecomprisessixhistoricalframes(capturingonehourofpastdata)used
+toforecastthesubsequenttwelveframes(representingatwo-hourfuturehorizon). Thefinespatialandtemporalresolutionof
+thisdatasetenablesdetailedmodelingandanalysisofconvectiveprecipitationdynamicsacrossadenselypopulatedtropical
+environment.
+2.3 ExperimentalSetup
+AllexperimentswereconductedwithinaKaggle-hostedJupyterNotebookenvironment,usingPyTorch(v2.6.0)andPython
+(v3.10.4)onanUbuntu20.04operatingsystem. ComputationwasperformedonanIntelXeonCPU(2cores,4threads),with
+acceleratedtrainingsupportedbyanNVIDIATeslaP100GPUrunningCUDAv12.4.
+Models were trained for 100 epochs using the AdamW optimizer. The initial learning rate was set to 0.0110207 and
+adaptivelyadjustedviatheReduceLROnPlateauscheduler,whichmonitorsvalidationlossandreducesthelearningratebya
+factorof0.1ifnoimprovementisobservedoverfourconsecutiveepochs(patience=10). Aminimumlearningratethreshold
+of10−6wasenforcedtoensurenumericalstabilityduringconvergence.
+2.4 EvaluationMetrics
+Theperformanceoftheproposedprecipitationnowcastingmodelisassessedusingthreecomplementarymetrics: RootMean
+SquaredError(RMSE),StructuralSimilarityIndexMeasure(SSIM),andCriticalSuccessIndex(CSI).Toevaluatesensitivity
+acrossrainfallintensities,CSIiscomputedattwothresholds,1mm/hand8mm/h,denotedasCSI(1)andCSI(8).
+2.5 EvaluationMetrics
+Theperformanceoftheproposedprecipitationnowcastingmodelisassessedusingthreecomplementarymetrics:MeanSquared
+Error(MSE),StructuralSimilarityIndexMeasure(SSIM),andCriticalSuccessIndex(CSI).Toevaluatesensitivityacross
+rainfallintensities,CSIiscomputedattwothresholds,1mm/hand8mm/h,denotedasCSI(1)andCSI(8).
+MSEquantifiestheaverageofthesquareddifferencesbetweenpredictedandobservedvalues,offeringaglobalmeasureof
+numericalaccuracy. UnlikeRMSE,MSEdoesnottakethesquarerootoftheerrorterm,makingitmoresensitivetolarger
+errorsandbettersuitedforoptimizationinmanylearningalgorithms.
+SSIMcomparespredictedandobservedprecipitationfieldsbasedonlocalluminance,contrast,andstructuralpatterns.
+Rangingfrom−1to1,higherSSIMvaluesindicatebetterpreservationofspatialstructure,whichiscrucialforapplications
+involvingradarreflectivityfields.
+4/17
+
+=== PAGE 5 ===
+CSI,alsoknownasthethreatscore,quantifiestheoverlapbetweenpredictedandobservedbinaryprecipitationevents. Itis
+definedastheratiooftruepositivestothesumoftruepositives,falsepositives,andfalsenegatives. CSIisparticularlyvaluable
+forimbalanceddatasetsandrareeventdetection. Theuseofdualthresholdsenablesevaluationofbothlightandheavyrainfall
+events.
+Together,MSE,SSIM,andthresholdedCSIprovideacomprehensiveevaluationframework,capturingpointwiseaccuracy,
+spatialconsistency,andevent-leveldetectionperformanceessentialforoperationalnowcasting.
+2.6 ExperimentalResults
+2.6.1 QuantitativeResults
+Table2. QuantitativecomparisonofforecastingperformanceacrossdifferentmethodsontheMRMSandNhaBedatasets.
+Dataset Method MSE(↓) SSIM(↑) CSI(1)(↑) CSI(8)(↑)
+PySTEPS8 107.52 0.75 0.402 0.198
+The
+MRMS NowcastNet31 42.33 0.88 0.734 0.612
+Dataset TrajGRU13 91.23 0.81 0.508 0.312
+(450,1000)
+ThoR(Ours) 40.24 0.94 0.702 0.653
+PySTEPS8 102.38 0.76 0.387 0.182
+The
+MRMS NowcastNet31 39.61 0.89 0.756 0.531
+Dataset TrajGRU13 89.33 0.80 0.488 0.294
+(1400,3000)
+ThoR(Ours) 44.25 0.91 0.712 0.575
+PySTEPS8 101.27 0.79 0.352 0.132
+The
+MRMS NowcastNet31 35.53 0.88 0.835 0.528
+Dataset TrajGRU13 83.61 0.81 0.504 0.230
+(1700,5500)
+ThoR(Ours) 34.12 0.89 0.755 0.556
+PySTEPS8 86.19 0.84 0.412 0.179
+The NowcastNet31 53.77 0.96 0.811 0.599
+NhaBe
+Dataset TrajGRU13 85.12 0.83 0.325 0.230
+ThoR(Ours) 49.23 0.91 0.742 0.612
+AsshowninTable2,theproposedThoRmodelconsistentlydemonstratessuperiorperformancecomparedtobaseline
+methods—PySTEPS,NowcastNet,andTrajGRU—acrossallevaluationmetricsonboththeMRMSandNhaBedatasets,under
+aunifiedexperimentalprotocol.Notably,ThoRachievesthelowestaverageMeanSquaredError(MSE)of40.33,outperforming
+TrajGRU(102.21),NowcastNet(46.15),andPySTEPS(113.67)whenevaluatewithallexperiments,correspondingtoa12.61%
+reduction in error relative to the best-performing baseline (NowcastNet). This result underscores ThoR’s effectiveness in
+deliveringmoreaccuratepixel-wiserainfallintensityforecasts.
+ToassessThoR’sgeneralizationcapability,weconductedacomprehensiveevaluationoverthreegeographicallydiverse
+subregionsoftheMRMSdataset. TheoriginalMRMSdata,withaspatialresolutionof(3500,7000),waspartitionedinto
+threerepresentativesubregionswithtop-leftcoordinatesat(450,1000),(1400,3000),and(1700,5500),eachcroppedtoa
+standardizedsizeof(256,256)forconsistentcomparison. Acrossallregionsandevaluationmetrics,ThoRoutperformsthe
+baselinemodels,demonstratingrobustgeneralization.
+Inthesubregionat(450,1000)(approximatelyLatitude: 29.3◦N,Longitude: −109.3◦E),ThoRachievesthelowestMSE
+of40.24,outperformingTrajGRU(91.23),NowcastNet(42.33),andPySTEPS(107.52),reflectinga4.94%reductioninerror
+compared to the strongest baseline. Additionally, ThoR achieves the highest Structural Similarity Index (SSIM) of 0.94,
+indicatingimprovedpreservationofspatialstructures. IntermsoftheCriticalSuccessIndex(CSI),ThoRobtainsscoresof
+0.702and0.653atthresholds1(mm/h)and8(mm/h),respectively,indicatingstrongdetectioncapabilitiesforbothlightand
+heavyprecipitation.
+5/17
+
+=== PAGE 6 ===
+Inthesecondregion,locatedincentralAmericawithtop-leftcoordinatesat(1400,3000)(approximatelyLatitude:33.85◦N,
+Longitude: −106.60◦E),ThoRmaintainscompetitiveperformancewithanMSEof44.25,lowerthanTrajGRU(89.33)and
+slightlyhigherthanNowcastNet(39.61). ThoRachievesanSSIMof0.91,confirmingitscapacitytopreservefine-grained
+spatial features. The model also attains CSI scores of 0.712 at 1 (mm/h) and 0.575 at 8 (mm/h), demonstrating reliable
+detectionacrossvaryingrainfallintensities.
+Inthethirdregionat(1700,5500)(approximatelyLatitude: 38.1◦N,Longitude: −81.4◦E),representativeoftheunique
+meteorologicalcharacteristicsofSouthEastAmerica,ThoRachievesthelowestMSEof34.12,outperformingbothTrajGRU
+(83.61)andNowcastNet(35.53). ThoRalsoachievesthehighestSSIMof0.89andaCSI(8)of0.556,clearlydemonstratingits
+effectivenessincapturinglocalizedhigh-intensityrainfallevents.
+TheseconsistentimprovementsacrossallMRMSsubregionshighlightThoR’sstronggeneralizationabilityacrossvaried
+geographicalandmeteorologicaldomains. Themodel’scapacitytoachievelowMSE,highSSIM,andstrongCSIperformance
+acrossmultiplethresholdsmakesitarobustcandidateforoperationaldeploymentinreal-timenowcastingsystems. Consistent
+performance trends are also observed on the Nha Be dataset, which represents a tropical convective storm regime typical
+ofSouthernVietnam. ThoRachievesthelowestMSEof49.23,outperformingTrajGRU(85.12),NowcastNet(53.77),and
+PySTEPS(86.19). TheSSIMscoreof0.91furthersupportsitsstructuralpreservationability,exceedingTrajGRU(0.83)though
+slightlybelowNowcastNet(0.96),confirmingrobustnessacrossdifferentmeteorologicalconditions. Inurbancontextssuchas
+HoChiMinhCity,thisstructuralintegrityisessentialforeffectivefloodriskassessmentandreal-timesituationalawareness.
+ThoRalsoachievesconsistentlystrongCSIperformanceontheNhaBedataset,recordingaCSI(1)of0.742,whichis
+substantiallyhigherthanTrajGRU(0.325)andclosetoNowcastNet(0.811). Moresignificantly,ThoRachievesaCSI(8)of
+0.612,outperformingTrajGRU(0.230),NowcastNet(0.527),andPySTEPS(0.179). TheseresultsaffirmThoR’scapacityto
+detecthigh-intensitylocalizedrainfallevents,acriticalchallengeintropicalnowcasting.
+Overall,theproposedThoRframeworkexhibitsbalancedperformanceacrossmultipleevaluationcriteria. Theconcurrent
+achievementoflowMSE,highSSIM,andstrongCSIacrossmultiplethresholdsreflectsitscomprehensivemodelingcapacity.
+The improvements inCSI athigher thresholds, particularlyCSI(8), underscore ThoR’s potential for integrationinto early
+warningsystemswherethereliabledetectionofsevererainfallisparamount. Thesefindingsnotonlydemonstratestatistical
+significancebutalsopracticalrelevance,highlightingThoR’sapplicabilityinbothcontinentalandtropicalforecastingscenarios.
+2.6.2 QualitativeResults
+Weconductaqualitativeassessmenttoevaluatetheabilityofthemodelstoforecastextremeprecipitationevents. Asillustrated
+inthefiguresbelow,ThoRdemonstratesgreateraccuracyinpredictinghighrainfallintensities. Moreover,ThoRproduces
+sharperforecastswithspectralcharacteristicsthatmorecloselyalignwithradarobservationsata1-hourleadtime, while
+alsoexhibitingreducedsmoothingeffectsat2-hourleadtimes. ThesefindingshighlightThoR’scapabilitytocaptureboth
+mesoscaleandconvective-scaleprecipitationstructuresduringextremeweatherconditions.
+Figure2. AsinglepredictionatT+10min,T+1handT+2hleadtimeswithThoRforthreedifferentproposedlocationusing
+MRMSdataset.
+Thefirstthreecasestudiesencompassbothisolatedandconsecutiveheavyrainfallandhailstormeventsoccurringacross
+threedistinctregionsintheUnitedStates,aspreviouslydescribed. Thecorrespondingfiguresdepicttheforecastresultsstarting
+fromthereferencetimeT,withleadtimesdenotedinminutes(e.g.,T+10minindicatesa10-minuteforecasthorizon). For
+6/17
+
+=== PAGE 7 ===
+eachcase,thetoprowdisplaystheinputobservations,themiddlerowshowsthecorrespondinggroundtruth,andthebottom
+rowpresentspredictionsgeneratedbyThoR,facilitatingdirectvisualcomparison.
+Fromthegroundtruth,theprecipitationsystemsexhibitnotablespatiotemporalevolution. Duringthe0–2hourforecast
+window,low-intensityechoregionsprogressivelycontract,whereasareasofheavyprecipitation(>30mm/h)expandslightly.
+Notably,strongechocores(>40mm/h)showsignsofintensityamplificationwhileremainingquasi-stationary.Thisdifferential
+behaviorbetweenlow-andhigh-intensityechoesreflectsthenonlinearcouplingbetweenconvectiveupdraftsandprecipitation
+particle growth processes within mesoscale convective systems, underscoring ThoR’s ability to approximate the forward
+dynamicsofpartialdifferentialequationsinatmosphericmodeling.
+ThoR also demonstrates robust generalization under tropical weather conditions, as exemplified by a case study from
+NhaBe,Vietnam. Figure3presentsforecastresultsbasedondatafromtheNhaBeRadarStation,whereThoRsuccessfully
+capturestheoverallmorphologyoftheprecipitationfieldandcharacterizesitstemporalevolution. Theframeworkshows
+particularstrengthinmodelingthemergingprocessesofprecipitationbands,accuratelypredictingboththeintensityandspatial
+redistributionofprecipitationcores.
+Figure3. AsinglepredictionatT+10min,T+1handT+2hleadtimeswithThoRatusingNhaBeDataset.
+ThoReffectivelycapturesthespatiotemporalevolutionofprecipitationsystems. Althoughitsdepictionofprecipitation
+morphologyismoderatelysmoothed,themodelaccuratelyreproducesthespatialdistributionandtemporalprogressionof
+observedrainfallfields. Itshowsstrongskillinforecastingregionsofheavyprecipitation(>40mm/h),withpredictedpatterns
+closelymatchingradarobservations.However,ThoRtendstosystematicallyunderestimatetheintensityofextremeprecipitation
+cores(>50mm/h)byapproximately4–10mm/h,despitecorrectlyidentifyingtheirlocations. Thisunderestimationlikely
+resultsfromthesmoothingoflocalmaxima,aconsequenceofregularizationeffectsinherenttothedeeplearningarchitecture.
+Nonetheless, given the inherent complexity of cyclone propagation and the rarity of extreme precipitation events, further
+refinement across models is needed to improve the accuracy of rainfall structure forecasting and extreme echo intensity
+prediction.
+2.7 AblationStudy
+2.7.1 ModelSelection
+Figure4illustratestheeffectivenessoftheproposedThoRframework,whichintegratesknowledgefromtwocomplementary
+cascadingnetworks: amotionextractionnetworkandageneratornetworkemployingtemporal-spatialmodeling. Together,
+thesecomponentsgeneratenext-hourprecipitationmapswithinagenerativeadversarialnetwork(GAN)framework.
+Toevaluatetheindividualcontributionsofeachcomponent,wecomparethreedual-teacherbaselineconfigurations: (i)
+Motion-dependentGenerator,whichgeneratesprecipitationmapsusingboththemotionnetworkandgeneratorwithoutthe
+adversariallearningcomponent;(ii)GeneratorOnly,wherethemotionfieldislearnedimplicitlywithinthegenerator,similar
+totheTrajGRUarchitecture13;and(iii)thecompleteThoRframework. AsshowninFigure4,theMotion-dependentGenerator
+outperforms the Generator Only model, suggesting that explicit motion extraction contributes significantly to forecasting
+accuracy.
+Furthermore,integratingthesecomponentsintoaGAN-basedarchitectureyieldsasubstantialreductioninnowcasting
+error,highlightingthecriticalroleofadversariallearninginrefiningthegeneratedprecipitationmaps.
+7/17
+
+=== PAGE 8 ===
+Figure4. AblationStudiesonBackboneSelection.
+The ThoR framework achieves the best performance across all configurations by effectively combining motion-based
+guidanceandadversarialsupervision. Thisdemonstratesthecomplementaryadvantagesofexplicitmotionmodelingand
+generative learning, reinforcing the importance of semi-supervised strategies in spatiotemporal forecasting. Our findings
+confirmthatincorporatingphysicallymeaningfulmotionfieldsandadversarialobjectivescansubstantiallyimprovepredictive
+accuracyinprecipitationnowcasting.
+2.7.2 ObjectiveCombination
+Table3presentsanablationstudyevaluatingthecontributionsofvariouslosscomponentsinourframework. Specifically,
+we analyze the effect of the traditional neural network optimization loss (L ), the physics-informed loss incorporating
+NN
+advection-diffusionconstraints(L ),themotionconsistencylosswithHorn–Schunckregularization(L ),andan
+physics velocity
+adversariallearningloss(L ).
+adv
+UsingonlyL yieldsbaselineCriticalSuccessIndex(CSI)scoresof0.614atthe1mm/hthresholdand0.503at8mm/h.
+NN
+Introducingthephysicsconstraint(L )significantlyimprovesCSI(1)to0.655,whereasincorporatingonlythemotionloss
+physics
+(L )resultsinamodestincreaseto0.621,suggestingthatglobalphysicspriorscontributemoresubstantiallytodynamic
+velocity
+consistencythanlocalmotionsmoothness.
+CombiningL withbothL andL leadstofurtherimprovements,achieving0.713at1mm/hand0.572at
+NN physics velocity
+8mm/h. Thisindicatesthatglobalandlocalphysicalconstraintsprovidecomplementaryguidanceduringtraining.
+Finally,theadditionofadversariallearningviaL leadstothehighestperformance,withCSIscoresof0.796(1mm/h)
+adv
+and0.630(8mm/h),demonstratingtheeffectivenessofGAN-basedtraininginenhancingrealismandfidelityinprecipitation
+forecasts.
+Overall,theseresultshighlightthecriticalroleofphysics-informedandadversariallossesinimprovingbothaccuracyand
+physicalconsistency,underscoringthenecessityofintegratingtraditionaloptimizationwithdomain-specificconstraintsfor
+robustprecipitationnowcasting.
+Table3. AblationStudiesonObjectiveCombination
+L L L L CSI(1) CSI(8)
+NN physics velocity adv
+✓ 0.614 0.503
+✓ ✓ 0.655 0.512
+✓ ✓ 0.621 0.504
+✓ ✓ 0.639 0.541
+✓ ✓ ✓ 0.713 0.572
+✓ ✓ ✓ ✓ 0.796 0.630
+8/17
+
+=== PAGE 9 ===
+3 Methods
+3.1 Constraint-CentricSoftTFCforPhysicallyConsistentPrecipitationForecasting
+Parametricdifferentialequations(DEs)lieattheheartofmathematicalmodelingindynamicalsystems,servingasaunifying
+language across disciplines such as fluid mechanics, meteorology, finance, and beyond29. In this work, we advance the
+applicationoftheTheoryofFunctionalConnections(TFC)totheproblemofprecipitationnowcasting—anotoriouslycomplex
+taskcharacterizedbyhigh-dimensional,nonlinearspatio-temporaldynamics.
+Ourproposedframeworkintegratesrigorousphysicallawswithdeepneuralapproximation,effectivelybridgingforward
+modelingviapartialdifferentialequations(PDEs)withdata-drivenlearning. Byincorporatingthegoverningequationsof
+fluiddynamicsashardconstraints—botharchitecturallyandinthelossformulation—weenforcecompliancewiththeintrinsic
+structureofatmosphericmotion. Theresultisahybridframeworkthatnotonlyimprovespredictivefidelitybutalsoenhances
+physicalinterpretability.
+LettheprecipitationfieldbedenotedbyR:T ×D →R,whereT ⊆R denotesthetemporaldomainandD ⊆Rh×wthe
+≥0
+spatialdomain. WedefineaparametricPDEgoverningthedynamicsofRthroughaforecastingfunction f:
+γf +N [f;λ]+ε−U =0, (3)
+t
+where f := f(t,R;γ(t,R),λ(t,R))representsalatentsolutiontobeapproximated. Here, γ ∈G ⊆Randλ ∈L ⊆Rm are
+scalarandvector-valuedparameterfunctions,respectively,whichencodetheunderlyingphysics. TheoperatorN [·;λ]denotes
+apossiblynonlineardifferentialoperator,andU isaknownexternalforcingterm. Theresidualε modelsuncertaintyandnoise,
+oftennegligibleinthedeterministiclimit.
+Thisformulationenablesaunifiedtreatmentofbothforwardandinverseproblems. Whenγ andλ areknown, (3)definesa
+well-posedinitial-boundaryvalueproblem;otherwise,itadmitsaninverseformulation,amenabletovariationalinferenceor
+learning-basedestimation.
+Figure5. SchematicrepresentationofourConstraint-CentricsoftTFCframework,embeddingPDEdynamicsintodeep
+learningforprecipitationforecasting.
+Themodelarchitecture,illustratedinFigure5,followsatwo-stageparadigm: (1)estimationoflatentmotionfieldsviaa
+physics-regularizedencoder-decodernetwork,and(2)resolutionofthegoverningPDEs—primarilytheadvection–diffusion
+andBurgers’equations—toextrapolatefutureprecipitationstates.
+Crucially,thelatentfunction f isapproximatednotdirectly,butthroughaconstrainedfunctionalformthatsatisfiesboundary
+andinitialconditionsanalytically:
+f(t,R)=g(R,V;Θ)+L(R,V;Θ), (4)
+where Θ=[θ,φ]⊤ encodes the model parameters, V=(u,v)∈Rt×2×h×w denotes the estimated velocity field, and L is a
+constraint-satisfyingfunctionalderivedviaTFC.Thefreefunctiongisconstructedinthenullspaceoftheconstraintsand
+realizedbyanExtremeLearningMachine(ELM)34:
+g(R,V;Θ)=G(R ,V;Θ), (5)
+1:t
+whereGisadeepgeneratornetworkthatlearnsnonlinearmappingsfrompastprecipitationstatesandmotioncues.
+ThetotaloptimizationobjectiveoftheThoRframeworkisdefinedasacompositelossfunctionconsistingofthreeprincipal
+components:
+L(Rˆ,R;V)=λ L (R,Rˆ)+λ L (Rˆ,V)+λ L (V), (6)
+NN NN PC PC MC MC
+9/17
+
+=== PAGE 10 ===
+inspired by the Physics-Informed Neural Networks (PINNs) paradigm proposed by Raissi et al, where λ ,λ ,λ are
+NN PC MC
+weightsoflossterms35. Inthisformulation,L denotesaconventionaldata-fittingterm,typicallythemeanabsoluteerror,
+NN
+optimizedthroughstandardbackpropagation-basedminimization. ThetermL (Rˆ,V)encodesphysics-basedconstraints
+PC
+derivedfromtheadvection–diffusionequation,ensuringphysicalplausibilityofthegeneratedforecasts. Additionally,L (V)
+MC
+imposesmotionfieldregularizationinformedbyBurgers’equation36andHorn–Schuncksmoothnesspriors37,encouraging
+coherentandphysicallyconsistentmotiondynamics.
+ThisapproachrepresentsamathematicallyrigorousandphysicallyinterpretableinstanceofsoftTFCforprecipitation
+nowcasting, wherein deep neural networks are not merely fitted to data but structured by physical theory. The result is a
+coherentframeworkforhigh-resolutionprecipitationnowcasting—onethatisprovablyconstraint-satisfying,empiricallyrobust,
+andtheoreticallygrounded.
+3.2 UnsupervisedPINNsforMotionFieldExtraction
+3.3 Motionfieldestimationmodule
+Thefirstcomponentofourframeworkisanunsupervisedneuralnetworkdesignedtoestimatemotionfieldsfromsequencesof
+precipitationmaps. Tothisend,weemployaConditionedOperatorU-Netarchitecture,whichconsistsoffourdownsampling
+and four upsampling layers, to learn a mapping from a sequence of precipitation observations R to the corresponding
+1:t
+motionfieldattimestept,denotedasV =(u,v). Here,u andv representthehorizontalandverticalvelocitycomponents,
+t t t t t
+respectively,asillustratedinFigure6.
+Figure6. ArchitectureoftheproposedConditionedU-Netformotionfieldestimation. Thenetworkemploysasymmetric
+encoder–decoderstructurewithfourdownsamplingandfourupsamplingblocks. Itistrainedinanunsupervisedfashionusing
+alossfunctiongroundedinphysicalconstraints,therebyeliminatingtheneedforexplicitmotionannotations. Afterextracting
+theinitialmotionfield,itisrecursivelypropagatedforwardintimetopredictfuturemotionfields.
+ThisdesignisinspiredbytheclassicalHorn–Schunckopticalflowmethod,whichimposesaspatialsmoothnessconstraint
+10/17
+
+=== PAGE 11 ===
+onthemotionfieldviaaregularizationterm:
+(cid:90)
+(cid:0) |∇u|2+|∇v|2(cid:1)
+dx, (7)
+where∇uand∇varethespatialgradientsofthehorizontalandverticalvelocitycomponents,respectively38.
+Giventheapproximatelylog-normaldistributionofrainfallrates39,itiscrucialtoapplydifferentiatedweightingtobalance
+theinfluenceoflight,moderate,andheavyrainfalleventsduringtraining. Withoutthisadjustment,neuralnetworkstendto
+overfittothemorefrequentlow-to-moderateintensities,leadingtounderrepresentationofhigh-intensityprecipitationpatterns.
+FollowingtheDGMRframework18,weadoptacappedweightingfunctionw(R)=min(24,1+r)tomitigatetheinfluenceof
+t
+extremeoutliers.
+Buildingontheseinsights,wedefineaHorn–Schunck-inspiredregularizationtermforthemotionfieldV conditionedon
+t
+theprecipitationmapR as:
+t
+(cid:13) (cid:112) (cid:13)2 (cid:13) (cid:112) (cid:13)2
+J =(cid:13)∇u ⊙ w(R)(cid:13) +(cid:13)∇v ⊙ w(R)(cid:13) , (8)
+HornSchunck (cid:13) t t (cid:13) (cid:13) t t (cid:13)
+2 2
+where ⊙ denotes element-wise multiplication, and ∇u, ∇v are spatial gradients (in the x- and y-directions, respectively)
+t t
+computed using Sobel filters. This formulation imposes stronger smoothness in areas of heavy precipitation, promoting
+physicallyplausibleandspatiallycoherentmotionestimationwhereaccuratemodelingismostcritical. Unlikeconventional
+image-based optical flow techniques, our approach leverages physically meaningful quantities, specifically precipitation
+intensity,toguidetheregularization.
+However,real-worldatmosphericmotionfieldsevolveovertime. Toaccountforthistemporalvariation,weassumethatthe
+motionfieldsequence{V}evolvesaccordingtothetwo-dimensionalBurgers’equations,afluiddynamicsmodelwidelyused
+i
+forapproximatingnonlinearadvection–diffusionprocesses40:
+∂u ∂u ∂u (cid:18) ∂2u ∂2u (cid:19)
+=−u −v +µ + ,
+∂t ∂x ∂y ∂x2 ∂y2
+(9)
+∂v ∂v ∂v (cid:18) ∂2v ∂2v (cid:19)
+=−u −v +µ + ,
+∂t ∂x ∂y ∂x2 ∂y2
+whereµ >0denotesthekinematicviscositycoefficient. IntroducingthevectornotationV=(u,v)⊤,wecompactlyrewritethe
+systemas
+∂V
+=−(V·∇)V+µ∇2V. (10)
+∂t
+Tosimulatethediscrete-timeevolutionofthefield,weemployanexplicittime-steppingscheme. Letting∆t>0denotethe
+timeincrement,andapproximatingthetemporalderivativeviaafirst-orderforwarddifference:
+∂V(cid:12) V −V
+(cid:12) ≈ t+∆t t , (11)
+∂t (cid:12) t ∆t
+substitutionintoEq.(10)yieldstheforwardEulerupdate:
+V =V +∆t (cid:2) −(V ·∇)V +µ∇2V (cid:3) . (12)
+t+∆t t t t t
+Equation (12) serves as an explicit recursive formulation for evolving the velocity field in time. While the scheme is
+conditionallystable,itssimplicityrendersitparticularlysuitableforembeddingintodifferentiablesimulationframeworksor
+deeplearningarchitecturesrequiringend-to-endtractablegradients.
+3.4 ThoRFramework
+Skillfulnowcastingnecessitatestheintegrationofphysicalprincipleswithadvancedstatisticallearningmethodologies31. In
+pursuitofthisobjective,weintroduceThoR,aunifiedneuralnetworkframeworkdesignedtofacilitateend-to-endoptimization
+offorecastingerrors. Theproposedapproachleveragesaphysics-informeddeepgenerativemodel,whichisconditionedon
+estimatedmotionfields,topredictfutureradarreflectivitybasedonhistoricalobservations. Thearchitecturecomprisestwo
+principalcomponents: astochasticgeneratorparameterizedbyθ,optimizedviaadiscriminatorandaphysicalregularization
+term,andanunsupervisedmotionestimationmodulegovernedbyparametersφ.
+11/17
+
+=== PAGE 12 ===
+Asarticulatedin31,themultiscalecharacteristicsofatmosphericprocessesengenderintricatedependenciesacrossboth
+spatialandtemporaldimensions,whichsignificantlyconstrainthepredictabilityofweathersystems. Convectivephenomena,in
+particular,exhibitacutesensitivitytouncertaintiesininitialconditions,resultinginrapidamplificationofforecastingerrors.
+Suchsensitivityimposesintrinsiclimitationsonconventionaladvection-basedapproaches,confiningtheirapplicabilityto
+spatialresolutionsofapproximately20kmandforecasthorizonsshorterthanonehour. Attemptstonaivelycombineneural
+networkswithphysicalconstraintsoftenfailtoadequatelyaccountforthismultiscalevariability,leadingtodistortedmesoscale
+andconvective-scalestructuresandtheemergenceofconfoundingartifacts.
+Tomitigatethesechallenges,weproposeamodelingstrategywhereinthespatiotemporalgenerationprocessisconditioned
+on a learned motion fieldV. This conditioning mechanism enhances the model’s capacity to capture recurrent structural
+dependenciesacrossscales. Asaresult,theThoRframeworkeffectivelyintegratesphysicallygovernedmesoscalepatterns
+withdata-drivenconvective-scalefeaturesextractedfromradarimagery,yieldingaccurateandmultiscale-consistentforecasts
+tailoredforthenowcastingtask.
+Figure7. a. ThearchitectureofThoR,aphysics-conditionalframeworkwithadeepgenerativemodel. Thenowcasting
+encodercapturesspatialcontextualrepresentationsusingarecurrentneuralnetworkenhancedwithspatialaggregationviaaxial
+attentionblocks. Itisconditionedonaphysics-informedmotionfieldpredictedbythemotionextractionnetwork. b. Detailed
+structureoftheproposedMotion-guidedConvGRUblock.
+3.4.1 ConditionedTemporalEncoder
+WeformulatetheprecipitationnowcastingtaskinalignmentwiththemodelingframeworkintroducedinEquation2. The
+proposedThoRmodeloperatesonaninputtensorofdimensions[t,h,w],whichrepresentsasequenceofhistoricalprecipitation
+maps. This input sequence is first processed to extract a contextual representation, which is subsequently utilized by the
+temporalsamplingmodule. Thetemporalsamplerisinstantiatedasaconvolutionalgatedrecurrentunit(ConvGRU),which
+incorporatesboththecontextualfeaturesandalearnedlatentrepresentation. However,incontrasttostandardimplementations,
+weaugmenttheConvGRUarchitecturebyexplicitlyconditioningitonmotionfieldsderivedfromadedicatedMotionExtraction
+U-Net.
+Convolutional recurrent neural networks (ConvRNNs), including ConvGRU, have demonstrated efficacy in capturing
+spatiotemporal correlations. Nonetheless, a fundamental limitation of these models lies in their use of location-invariant
+convolutionaloperations. Specifically, theconvolutionalfiltersandtheirassociatedreceptivefieldsremainspatiallyfixed,
+therebyimplicitlyassuminguniformmotiondynamicsacrossthespatialdomain. Thisassumptionunderminesthemodel’s
+abilitytorepresentcomplexandheterogeneousmotionphenomena,suchasrotation,scaling,ordeformation,whichinherently
+involvespatiallyvaryingflowfields. Consequently,standardConvRNNarchitecturesareill-suitedforscenarioscharacterized
+bynon-stationarydynamics,wherespatialdependenciesareneitherconsistentnorisotropic. Toovercomethislimitation,we
+proposealocation-variantmechanismthatdynamicallyadaptsboththeneighborhoodstructureandconvolutionalweights
+accordingtothelocalspatialcontext,therebyfacilitatingmoreaccuratemodelingofheterogeneousspatiotemporalpatterns.
+Inlightoftheseconsiderations,weintroducetheMotion-guidedConvGRU,anenhancedrecurrentmodulethatleverages
+12/17
+
+=== PAGE 13 ===
+thecurrentinputandtheprecedinghiddenstatetogenerateadynamic,location-specificneighborhoodsetateachspatialand
+temporalpoint. Thisdynamicstructureisconditionedonmotionfields,estimatedateachtimestepviatheMotionExtraction
+U-Net,whichencodestheunderlyingflowdynamics. ThecorecomputationalstepsoftheMotion-guidedConvGRUaredefined
+asfollows:
+(cid:32) (cid:33)
+L
+Z =σ W ∗R +∑Wl ∗warp(H ,u,v) ,
+t xz t hz t−1 t t
+l=1
+(cid:32) (cid:33)
+L
+R =σ W ∗R +∑Wl ∗warp(H ,u,v) ,
+t xr t hr t−1 t t
+(13)
+l=1
+(cid:32) (cid:32) (cid:33)(cid:33)
+L
+H′= f W ∗R +R ◦ ∑Wl ∗warp(Ht−1,u,v) ,
+t xh t t hh t t
+l=1
+H =(1−Z)◦H′+Z ◦H ,
+t t t t t−1
+Here,Ldenotesthenumberofpermitteddynamiclinks,andu,v ∈RL×h×wrepresenttheflowfieldsencodingspatially
+t t
+adaptiveconnectivitypatterns,asproducedbytheMotionExtractionU-Net(Section3.2). TheweightsWl,Wl,andWl
+hz hr hh
+correspond to 1×1 convolutional kernels that project the hidden state channels. The warp(H ,u,v) operation applies
+t−1 t t
+bilinear interpolation to the previous hidden state, enabling flexible spatial transformations. Formally, for an input tensor
+I ∈RC×H×W andflowfieldsU,V∈RH×W,thewarpingoperationyields:
+H W
+M = ∑ ∑I max(0,1−|i+V −m|)max(0,1−|j+U −n|), (14)
+c,i,j c,m,n i,j i,j
+m=1n=1
+Byjointlylearningtheparametersφ ofthemotionextractionnetwork,themodeladaptivelyinfersadynamicpixel-level
+connectivitystructure. Thisenablestherecurrentunittomoreeffectivelytracktemporalevolutionswithintheprecipitation
+sequences,withanemphasisonrecentdynamicsalignedwiththetemporalprogressionoftheinput.Acomparativevisualization
+oftherecurrentconnectivitypatternsinthestandardConvGRUandtheproposedMotion-guidedConvGRUispresentedin
+Figure8.
+Figure8. a. InstandardConvGRU,therecurrentconnectionsarefixedacrosstimeandspace. b. InMotion-guidedConvGRU,
+therecurrentconnectionsaredynamicallyconditionedonthemotionfieldsuandv.
+13/17
+
+=== PAGE 14 ===
+3.4.2 Attention-centricSpatialAggregator
+Oneofthefundamentallimitationsofrecursivemodelingstrategiesinprecipitationnowcastingistheirsusceptibilitytolong-
+termdependencydegradation. Theinherentlychaoticandnonlineardynamicsofatmosphericprocessesresultinsubstantial
+temporal variability and structural shifts in the joint distribution of radar observations. This pronounced non-stationarity,
+whichmanifestsacrossmultipletemporalscales,significantlyimpedesthemodel’scapacitytolearnstableandgeneralizable
+spatiotemporalfeatures,particularlyastheforecasthorizonextends.
+To address this challenge and to enhance the spatial modeling capabilities of the ThoR framework, our architecture
+incorporatesadedicatedattentionmodulecomprisingfourstackedaxialself-attentionblocks41. Twooftheseblocksoperate
+alongthewidthaxis, whiletheremainingtwoareappliedalongtheheightaxis. Incontrasttoconventionalself-attention
+mechanismsthatrequireflatteningthespatialdimensionsandcomputingpairwiseinteractionsacrosstheentire2Dgrid,thereby
+incurringquadraticcomputationalcost,axialattentiondecomposesthetwo-dimensionalattentionoperationintosequential
+one-dimensional operations along individual spatial axes. Specifically, self-attention is first applied across a single axis,
+followedbyapplicationalongtheorthogonalaxis. Thisfactorizationenablesthemodeltocapturelong-rangedependencies
+withsubstantiallyreducedcomputationaloverheadwhilepreservingtheoriginalinputdimensionality,whicheffectivelyextract
+spatiotemporalfeaturesandrefinethepredictedprecipitationmapsequences.
+3.5 Physics-GuidedLossFunctionBasedontheAdvection–DiffusionEquation
+Toincorporatedomain-specificphysicalknowledgeintothelearningprocess,weformulateaphysics-informedlossfunction
+groundedinthetwo-dimensionaladvection–diffusionequation. ThisPDEcharacterizesthespatiotemporalevolutionofradar
+reflectivitywithinadynamicallyadvectinganddiffusingfluidmedium. Thegoverningequationisexpressedas:
+∂R ∂R ∂R (cid:18) ∂2R ∂2R (cid:19)
+=−u −v +ν + , (15)
+∂t ∂x ∂y ∂x2 ∂y2
+whereR(x,y,t)denotestheradarreflectivityfield,u(x,y,t)andv(x,y,t)representthevelocitycomponentsinthexandy
+directions,respectively,andν isascalardiffusioncoefficient. Thisformulationencapsulatesthecompetingeffectsofadvection
+anddiffusion,whicharecentraltothetransportofprecipitationinatmosphericsystems.
+Toenabledifferentiableimplementationwithinaneuralnetwork,thePDEisdiscretizedusingfinitedifferenceapproxima-
+tionsimplementedviaconvolutionaloperations. GivenasequenceofradarreflectivityfieldsR∈RB×T×H×W andcorresponding
+velocityfieldsV ∈RT×B×2×H×W,thephysics-basedresiduallossderivedfromEquation15isdefinedas:
+J physics (R t ,V t )=
+(cid:13) (cid:13)
+(cid:13) (cid:13)
+R t −
+∆
+R
+t
+t−1
++u t
+∂
+∂
+R
+x
+t
++v t
+∂
+∂
+R
+y
+t
+−ν
+(cid:18) ∂
+∂
+2
+x
+R
+2
+t
++
+∂
+∂
+2
+y
+R
+2
+t (cid:19)(cid:13) (cid:13)
+(cid:13) (cid:13)
+2
+, (16)
+2
+whereJ (R,V)quantifiesthedeviationfromthephysicallygovernedevolutionofradarreflectivity.
+physics t t
+Withinourproposedframework,theadvection–diffusionequationisincorporatedasaregularizationtermthatpromotesthe
+generationofpredictionsexhibitingbothtemporalandspatialcoherence. Specifically,thevelocityfieldV ,estimatedbythe
+t,t+n
+MotionExtractionBlock,iscombinedwiththeobservedreflectivityframeR andthepredictedsequenceRˆ toenforce
+t t+1:t+n
+physicallyconsistentdynamicsoverthepredictionhorizon.
+However,itisacknowledgedthatnotallinputsequencesR adherestrictlytotheassumptionsthatunderlietheadvection-
+1:t
+diffusionmodel. Rigidenforcementofthephysicalconstraintinsuchcasesmayinadvertentlyimpairpredictiveaccuracy. To
+mitigatethisissue,weintroduceadynamicweightingmechanismviaaphysicsimportancecoefficient p,whichadaptively
+modulatestheinfluenceofthephysics-basedloss. Thefinalphysics-informedlossisdefinedas:
+1 1t+n
+L = · ∑J (R ,V ), (17)
+physics physics k k
+p n
+k=t
+where the weighting term p=emin(max(Jphysics(Rt,Vt),0),1) quantifies the consistency between the current observation and the
+underlyingphysicalmodel. AsmallerresidualJ (R,V)indicatesgreaterphysicalplausibility,resultingin p≈1and
+physics t t
+thusamplifyingtheinfluenceofthephysics-basedloss. Conversely,whentheresidualislarge—indicatinginconsistencywith
+physicallaws—pincreases(approachinge),therebyattenuatingthecontributionofthephysicsterm. Thisadaptiveformulation
+enablesthemodeltoprioritizephysicalconsistencywhenreliable,whileallowingflexibilityinthepresenceofobservational
+noiseordeviationsfromidealphysicalbehavior.
+14/17
+
+=== PAGE 15 ===
+3.6 ObjectiveFunction
+Weformulateprecipitationforecastingasagenerativemodelingproblemwithinanadversariallearningframework. Specifically,
+ourproposedmodel,ThoR,servesasthegenerator,whileaspatial-temporaldiscriminatorevaluatestherealismofpredicted
+precipitationfields. ThissetupadherestothecanonicalGenerativeAdversarialNetwork(GAN)structure,whereinthegenerator
+synthesizesplausibleprecipitationpatternsfrommeteorologicalinputs,andthediscriminatorlearnstodistinguishbetween
+observedandgeneratedsequences.
+Toguidethetrainingofthegenerator,wedesignacompositeobjectivethatintegratesdatafidelity,perceptualquality,and
+physicalconsistency. Theoverallgeneratorlossisdefinedasaweightedsumofindividuallossterms,eachreflectingadifferent
+facetoftheforecastingtask:
+L =αL +βL +γL +δL , (18)
+Generator velocity physics NN adv
+whereL forceestimatedmotionfieldsalignstoaphysicsconstraint,whichisshowninEquation8,L enforces
+velocity physics
+adherencetotheadvection–diffusionconstraint,mentioninEquation17,L aggregatesmultiplepixel-wiseandfeature-based
+NN
+losses,andL promotesperceptualrealismthroughadversarialtraining.
+adv
+TheneuralnetworklossL isdefinedas:
+NN
+L =λ L +λ L +λ L +λ L , (19)
+NN 1 L1 2 L2 3 ICL 4 Huber
+whereeachtermcontributesuniquely: L andL areweightedL1andL2losses,ensuringpixel-levelaccuracy,L
+L1 L2 Huber
+providesrobustnesstooutliersandL promotesevent-awareconsistencyacrosslatentrepresentations,focusingonhigh
+ICL
+intensityfeaturesasstormevents. StandardlossfunctionslikeMAEorMSEpenalizeincorrectpredictionstwice—oncefor
+misplacingstormsandagainformissingthecorrectlocation,leadingmodelstopreferuncertain,smoothedpredictions. This
+lossiscalculatedviacross-entropyontrinarymasksdefinedas
+
+0 ifx∈[0,4)
+
+L ICL =CE(M(xˆ),M(x))withM(x)= 1 ifx∈[4,8) withx∈R out inmm/h. (20)
+2
+ifx≥8
+Thelossweightsareempiricallytunedtobalancephysicalplausibilityandnumericalprecision,with:
+α =0.1, β =0.1, γ =0.75, δ =0.05,
+λ =0.2, λ =0.2, λ =0.2, λ =0.4
+1 2 3 4
+ThishybridlossdesignenablesThoRtogeneratepredictionsthatarephysicallyconsistent, numericallyaccurate, and
+perceptuallyplausible,promotinggeneralizabilityunderdiversemeteorologicalconditions.
+4 Conclusion
+Short-termforecastingofconvectiveprecipitationremainsapersistentandcriticalchallengeinatmosphericscience, with
+profound implications for hazard mitigation and the management of weather-sensitive operations. This study introduces
+ThoR,anovelattention-driven,physics-informeddeeplearningarchitectureembeddedwithintheTFCframework. Themodel
+approximatestheforwardsolutionofconvectivesystemdynamicsasgovernedbypartialdifferentialequations(PDEs),enabling
+accuratesimulationofstormevolutionandintensification.
+Byleveraginghigh-resolutionradarreflectivityandrainfallratedatafromboththeNhaBeradarstationinHoChiMinh
+CityandtheU.S.Multi-RadarMulti-Sensor(MRMS)system,ThoRdeliversrainfallpredictionswithleadtimesofuptotwo
+hours. Itsprobabilisticforecastingcapabilitiesfurthersupportadaptivewarningthresholds,improvingdecision-makingand
+reducingfalsealarmratesinoperationalcontexts. Importantly,ThoRreliessolelyonrainfallmapsasinputwhileincorporating
+physical constraints directly into its neural architecture. This fusion of data-driven learning and physics-based reasoning
+providesaprincipledapproachtomodelingthespatiotemporaldynamicsofconvectiveweathersystems,yieldingsuperior
+generalizationacrossdiversemeteorologicalregimes.
+ComprehensiveevaluationsonbothMRMSandNhaBedatasetsdemonstratethatThoRconsistentlysurpassesbaseline
+models,achievinglowermeansquarederror(MSE),higherstructuralsimilarityindex(SSIM),andenhancedcriticalsuccess
+index(CSI),particularlyforhigh-intensityprecipitationevents. TheseresultshighlightThoR’scapabilitytoaccuratelycapture
+fine-scalerainfallstructuresandextremeweatherphenomenaacrossdifferentclimaticandgeographicsettings. Futureworkwill
+focusonextendingtheforecastinghorizonwhilepreservingspatialandtemporalprecision,deployingthemodelinreal-time
+operationalenvironments—especiallyintropicalurbanregions—andintegratinguncertaintyquantificationandexplainability
+techniquestoenhancetrust,transparency,anddecisionsupportinhigh-stakesapplications.
+15/17
+
+=== PAGE 16 ===
+References
+1. Bauer,P.,Thorpe,A.&Brunet,G. Thequietrevolutionofnumericalweatherprediction. Nature525,47–55(2015).
+2. VietnamNews. Deadlydisastersin2024highlighttheneedforstrongerpreventionmeasures. https://vietnamnews.vn/
+society/1690003/deadly-disasters-in-2024-highlight-the-need-for-stronger-prevention-measures.html(2024). Accessed:
+2025-04-30.
+3. PC,S.etal. Comparisonofrainfallnowcastingderivedfromthestepsmodelandjmaprecipitationnowcasts. Hydrol.Res.
+Lett.9,54–60(2015).
+4. Hwang,Y.,Clark,A.J.,Lakshmanan,V.&Koch,S.E. Improvednowcastsbyblendingextrapolationandmodelforecasts.
+Weather.Forecast.30,1201–1217(2015).
+5. Sun, J. Convective-scale assimilation of radar data: progress and challenges. Q. J. Royal Meteorol. Soc. A journal
+atmosphericsciences,appliedmeteorologyphysicaloceanography131,3439–3463(2005).
+6. Buehner,M.&Jacques,D. Non-gaussiandeterministicassimilationofradar-derivedprecipitationaccumulations. Mon.
+Weather.Rev.148,783–808(2020).
+7. Fleet,D.&Weiss,Y. Opticalflowestimation. InHandbookofmathematicalmodelsincomputervision,237–257(Springer,
+2006).
+8. Pulkkinen,S.etal. Pysteps: Anopen-sourcepythonlibraryforprobabilisticprecipitationnowcasting(v1.0). Geosci.
+Model.Dev.12,4185–4219(2019).
+9. Tian,L.,Li,X.,Ye,Y.,Xie,P.&Li,Y. Agenerativeadversarialgatedrecurrentunitmodelforprecipitationnowcasting.
+IEEEGeosci.Remote.Sens.Lett.17,601–605(2019).
+10. Chung,K.-S.&Yao,I.-A. Improvingradarecholagrangianextrapolationnowcastingbyblendingnumericalmodelwind
+information: Statisticalperformanceof16typhooncases. monthlyweatherreview148,1099–1120(2020).
+11. Shi, X. et al. Convolutional lstm network: A machine learning approach for precipitation nowcasting. Adv. neural
+informationprocessingsystems28(2015).
+12. Wang, Y., Long, M., Wang, J., Gao, Z.&Yu, P.S. Predrnn: Recurrentneuralnetworksforpredictivelearningusing
+spatiotemporallstms. Adv.neuralinformationprocessingsystems30(2017).
+13. Shi, X. et al. Deep learning for precipitation nowcasting: A benchmark and a new model. Adv. neural information
+processingsystems30(2017).
+14. Wang,Y.etal. Predrnn: Arecurrentneuralnetworkforspatiotemporalpredictivelearning. IEEETransactionsonPattern
+AnalysisMach.Intell.45,2208–2225(2022).
+15. Keil,C.&Craig,G.C. Adisplacementandamplitudescoreemployinganopticalflowtechnique. Weather.Forecast.24,
+1297–1308(2009).
+16. Ishizuka,Y.&Aiyoshi,E. Doublepenaltymethodforbileveloptimizationproblems. AnnalsOper.Res.34,73–88(1992).
+17. Ma,Z.,Zhang,H.&Liu,J. Db-rnn: Anrnnforprecipitationnowcastingdeblurring. IEEEJ.Sel.Top.Appl.EarthObs.
+Remote.Sens.17,5026–5041(2024).
+18. Ravuri,S.etal. Skilfulprecipitationnowcastingusingdeepgenerativemodelsofradar. Nature597,672–677(2021).
+19. An,S.,Oh,T.-J.,Kim,S.-W.&Jung,J.J. Self-clusteredganforprecipitationnowcasting. Sci.Reports14,9755(2024).
+20. Yu, W. et al. Integrating spatio-temporal and generative adversarial networks for enhanced nowcasting performance.
+Remote.Sens.15,3720(2023).
+21. She,L.,Zhang,C.,Man,X.,Luo,X.&Shao,J. Aself-attentioncausallstmmodelforprecipitationnowcasting. In2023
+IEEEInternationalConferenceonMultimediaandExpoWorkshops(ICMEW),470–473(IEEE,2023).
+22. RotaBulo,S.,Neuhold,G.&Kontschieder,P. Lossmax-poolingforsemanticimagesegmentation. InProceedingsofthe
+IEEEconferenceoncomputervisionandpatternrecognition,2126–2135(2017).
+23. Hatsuzuka, D., Sato, T. & Higuchi, Y. Sharp rises in large-scale, long-duration precipitation extremes with higher
+temperaturesoverjapan. NpjClim.AtmosphericSci.4,29(2021).
+24. Roca, R.&Fiolleau, T. Extremeprecipitationinthetropicsiscloselyassociatedwithlong-livedconvectivesystems.
+Commun.Earth&Environ.1,18(2020).
+25. Ko,J.etal. Effectivetrainingstrategiesfordeep-learning-basedprecipitationnowcastingandestimation. Comput.&
+Geosci.161,105072(2022).
+16/17
+
+=== PAGE 17 ===
+26. Gao,Z.etal. Prediff: Precipitationnowcastingwithlatentdiffusionmodels. Adv.NeuralInf.Process.Syst.36,78621–
+78656(2023).
+27. Yu,D.etal. Diffcast: Aunifiedframeworkviaresidualdiffusionforprecipitationnowcasting. InProceedingsofthe
+IEEE/CVFConferenceonComputerVisionandPatternRecognition,27758–27767(2024).
+28. An,S.,Oh,T.-J.,Sohn,E.&Kim,D. Deeplearningforprecipitationnowcasting: Asurveyfromtheperspectiveoftime
+seriesforecasting. Expert.Syst.withAppl.268,126301(2025).
+29. Leake,C.&Mortari,D. Deeptheoryoffunctionalconnections: Anewmethodforestimatingthesolutionsofpartial
+differentialequations. Mach.learningknowledgeextraction2,37–55(2020).
+30. Schiassi,E.etal. Extremetheoryoffunctionalconnections: Afastphysics-informedneuralnetworkmethodforsolving
+ordinaryandpartialdifferentialequations. Neurocomputing457,334–356(2021).
+31. Zhang,Y.etal. Skilfulnowcastingofextremeprecipitationwithnowcastnet. Nature619,526–532(2023).
+32. Bieker,J. Mrmsprecipitationratedataset. (2022).
+33. Khang,T.G.etal. Thunderstormnowcastingwithrecurrent-convolutiondeeplearning: Acasestudyinhochiminhcity.
+In202418thInternationalConferenceonAdvancedComputingandAnalytics(ACOMPA),42–49(IEEE,2024).
+34. Huang,G.-B.,Zhu,Q.-Y.&Siew,C.-K. Extremelearningmachine: theoryandapplications. Neurocomputing70,489–501
+(2006).
+35. Raissi,M.,Perdikaris,P.&Karniadakis,G.E. Physics-informedneuralnetworks: Adeeplearningframeworkforsolving
+forwardandinverseproblemsinvolvingnonlinearpartialdifferentialequations. J.Comput.physics378,686–707(2019).
+36. Bonkile,M.P.,Awasthi,A.,Lakshmi,C.,Mukundan,V.&Aswin,V. Asystematicliteraturereviewofburgers’equation
+withrecentadvances. Pramana90,1–21(2018).
+37. Zikic,D.,Kamen,A.&Navab,N. Revisitinghornandschunck: Interpretationasgauss-newtonoptimisation. InBMVC,
+1–12(2010).
+38. Horn,B.K.P.&Schunck,B.G. Determiningopticalflow. Artif.Intell.17,185–203(1981).
+39. Crane,R.K. Space-timestructureofrainratefields. J.Geophys.Res.Atmospheres95,2011–2020(1990).
+40. Ryu,S.,Lyu,G.,Do,Y.&Lee,G. Improvedrainfallnowcastingusingburgers’equation. J.Hydrol.581,124140(2020).
+41. Ho,J.,Kalchbrenner,N.,Weissenborn,D.&Salimans,T. Axialattentioninmultidimensionaltransformers. arXivpreprint
+arXiv:1912.12180(2019).
+17/17

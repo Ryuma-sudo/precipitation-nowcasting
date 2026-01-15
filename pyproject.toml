@@ -1,0 +1,27 @@
+[project]
+name = "precipitation-nowcasting"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "arm-pyart>=2.1.1",
+    "axial-attention>=0.6.1",
+    "cartopy>=0.25.0",
+    "matplotlib>=3.10.7",
+    "numpy>=2.3.5",
+    "opencv-contrib-python>=4.11.0.86",
+    "scipy>=1.16.3",
+    "torchaudio>=2.9.1",
+    "torchdiffeq>=0.2.5",
+    "torchdyn>=1.0.6",
+    "torchmetrics>=1.8.2",
+    "torchvision>=0.24.1",
+    "wandb>=0.23.0",
+    "wradlib>=2.5.0",
+]
+
+[dependency-groups]
+dev = [
+    "ty>=0.0.1a27",
+]
